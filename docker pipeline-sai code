@@ -1,0 +1,29 @@
+node {
+    
+   def buildNumber = BUILD_NUMBER
+   
+   stage("git clone" ){
+       git url:"https://github.com/PYLASAIRAMGITHUB/java-web-app-docker.git", branch: "master"
+       }
+   stage ("maven build"){
+    def mavenHome=tool name:"maven", type:"maven"
+    sh "${mavenHome}/bin/mvn clean package"
+   }
+   stage ("create Docker image"){
+       sh "docker build -t pylasairam/java-web-apps-dockers:${buildNumber} ."
+   }
+   stage ("Docker login and Push"){
+       withCredentials([string(credentialsId: 'DockerHubPwd', variable: 'DockerHubPwd')]) {
+    sh "docker login -u pylasairam -p ${DockerHubPwd}"
+}
+     
+       sh "docker push pylasairam/java-web-apps-dockers:${buildNumber}"
+   }
+   stage ("Docker container create"){
+   sshagent(['DockerSsh']) {
+       sh "ssh -o StrictHostKeyChecking=no ec2-user@172.31.1.9 docker rm -f javawebcontainer || true"
+       
+       sh "ssh -o StrictHostKeyChecking=no ec2-user@172.31.1.9 docker run -d -p 8080:8080 --name javawebcontainer pylasairam/java-web-apps-dockers:${buildNumber}" 
+   }   
+}
+}
